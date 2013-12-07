@@ -103,7 +103,8 @@ int main(int argc, char *argv[]) {
 	unsigned short buf_gain[4] = { INIT_GAIN1_DB, INIT_GAIN2_DB, INIT_GAIN3_DB,
 			INIT_GAIN4_DB }; //буфер, служащий для коммуникации с драйвером усилителя
 	pid_t tmp_pid = 0;
-	printf("Size struct status_MAD = %d\n", sizeof(status_MAD));
+	WidthDet1 width = { INIT_WIDTH_PRIOR_EVENTS, INIT_WIDTH_AFTER_EVENTS,
+			INIT_WIDTH_PRIOR_EVENTS + INIT_WIDTH_AFTER_EVENTS };
 	//Инициализация аргументами командной строки соответствующих параметров программы
 	for (int i = 1; i < argc; i += 2) {
 		if (!strcmp("--mpc", argv[i]))
@@ -132,7 +133,13 @@ int main(int argc, char *argv[]) {
 			buf_gain[2] = static_cast<unsigned short>(atoi(argv[i + 1]));
 		else if (!strcmp("--g4", argv[i]))
 			buf_gain[3] = static_cast<unsigned short>(atoi(argv[i + 1]));
-		else if (!strcmp("--help", argv[i])) {
+		else if (!strcmp("--wp", argv[i])) {
+			width.wp = static_cast<unsigned short>(atoi(argv[i + 1]));
+			width.size = width.wp + width.wa;
+		} else if (!strcmp("--wa", argv[i])) {
+			width.wa = static_cast<unsigned short>(atoi(argv[i + 1]));
+			width.size = width.wp + width.wa;
+		} else if (!strcmp("--help", argv[i])) {
 			printf(
 					"\t--mpc     Port control MAD socket.                           default 31000\n"
 							"\t--mpd     Port data MAD socket.                              default 31001\n"
@@ -146,7 +153,9 @@ int main(int argc, char *argv[]) {
 							"\t--lwi     Window length measurements (in samples).           default 300\n"
 							"\t--lst     The length of the step of sliding (in samples).    default 10\n"
 							"\t--gx     Value gain of channel x (in dB).    default 51\n"
-							"\t--ans     The value of the noise floor.                      default 0\n");
+							"\t--ans     The value of the noise floor.                      default 0\n"
+							"\t--wp      Number of samples before the event in a transmission packet\n"
+							"\t--wa      Number of samples after the event in a transmission packet\n");
 			exit(0);
 		} else {
 			printf("Invalid argument!!!\n");
@@ -183,6 +192,14 @@ int main(int argc, char *argv[]) {
 	pstatusMAD->modeData_aq = DETECTION1;
 	pstatusMAD->NoiseThreshold = init_NoiseThreshold;
 	pstatusMAD->ident = COM_GET_STATUS_MAD;
+	if (width.size > MAX_SIZE_SAMPL) {
+		printf(
+				"Packet size %d does not match the length of the transmission buffer",
+				width.size);
+		exit(1);
+	}
+	pstatusMAD->wp = width.wp;
+	pstatusMAD->wa = width.wa;
 
 	//получение полных имён узлов устройств и открытие их файлов
 	strcat(node_of_adc, ADC_NAME);
@@ -434,6 +451,35 @@ int main(int argc, char *argv[]) {
 							sizeof(bagAddr_control));
 			}
 			break;
+		case COM_SET_WPWA:
+			if (que[iget].dg_len == sizeof(com_SET_WPWA)) {
+				if (repeat_com(que[iget], prevCom)) {
+					printf("Repeated command: %s\n", "COM_SET_WPWA");
+					break;
+				}
+				printf(
+						"Accepted a request to change the values ​​of wp and wa\n");
+				if (que[iget].dg_data[1] + que[iget].dg_data[2] > MAX_SIZE_SAMPL) {
+					printf(
+							"Packet size %d does not match the length of the transmission buffer",
+							que[iget].dg_data[1] + que[iget].dg_data[2]);
+					sendto(sockHandle,
+							reinterpret_cast<void*>(ans_SET_WPWA_NOT_OK),
+							sizeof(ans_SET_WPWA_NOT_OK), 0,
+							reinterpret_cast<sockaddr*>(&bagAddr_control),
+							sizeof(bagAddr_control));
+				}
+				else {
+					pstatusMAD->wp = que[iget].dg_data[1];
+					pstatusMAD->wa = que[iget].dg_data[2];
+					sendto(sockHandle,
+							reinterpret_cast<void*>(ans_SET_WPWA_OK),
+							sizeof(ans_SET_WPWA_OK), 0,
+							reinterpret_cast<sockaddr*>(&bagAddr_control),
+							sizeof(bagAddr_control));
+				}
+			}
+			break;
 		}
 		if (++iget >= QSIZE)
 			iget = 0;
@@ -501,6 +547,8 @@ void hand_SIGIO(int signo) {
 
 //ДОЧЕРНИЙ ПРОЦЕСС, ПРИНИМАЮЩИЙ ДАННЫЕ ОТ АЦП И ПЕРЕДАЮЩИЙ ИХ В DSP
 void data_acquisition_from_ADC() {
+	struct WidthDet1 wDet1 = { pstatusMAD->wp, pstatusMAD->wa, pstatusMAD->wp
+			+ pstatusMAD->wa };
 	current_mode cur_mode; //определяет текущий режим работы
 	cur_mode.mode = 0;
 	struct sigaction act_term; //структура, определяющая обработчик сигнала для SIGTERM
@@ -529,11 +577,11 @@ void data_acquisition_from_ADC() {
 	bagAddr_data.sin_port = htons(bag_port_data);
 	//получение размера приёмного и передающего буфера
 	int sizeRec = 0, sizeSend = 0;
-	unsigned int sizeofRect = sizeof(int), sizeofSend = sizeof(int);
-	sizeRec = getsockopt(sockHandle_data, SOL_SOCKET, SO_RCVBUF, &sizeRec,
-			&sizeofRect);
-	sizeRec = getsockopt(sockHandle_data, SOL_SOCKET, SO_SNDBUF, &sizeSend,
-			&sizeofSend);
+//	unsigned int sizeofRect = sizeof(int), sizeofSend = sizeof(int);
+//	sizeRec = getsockopt(sockHandle_data, SOL_SOCKET, SO_RCVBUF, &sizeRec,
+//			&sizeofRect);
+//	sizeRec = getsockopt(sockHandle_data, SOL_SOCKET, SO_SNDBUF, &sizeSend,
+//			&sizeofSend);
 	sizeRec = sizeSend = 2 * MAX_SIZE_SAMPL * 4 * sizeof(int);
 	if (setsockopt(sockHandle_data, SOL_SOCKET, SO_RCVBUF, &sizeRec,
 			sizeof(int)) == -1)
@@ -582,14 +630,18 @@ void data_acquisition_from_ADC() {
 		//какой режим передачи данных используется
 		switch (pstatusMAD->modeData_aq) {
 		case DETECTION1: //РЕЖИМ ФИЛЬТРОВАННОГО ПОТОКА ДАННЫХ (1 алгоритм распознавания)
-			if (!cur_mode.DETECTION1) { //если предыдущая передача была не в режиме DETECTION1
+			if (!cur_mode.DETECTION1 || wDet1.wp != pstatusMAD->wp
+					|| wDet1.wa != pstatusMAD->wa) { //если предыдущая передача была не в режиме DETECTION1 или изменилась размерность пакета передачи
 				buffer_f1.clear_count = 0;
 				cur_mode.mode = 0;
 				cur_mode.DETECTION1 = 1;
+				wDet1.wp = pstatusMAD->wp;
+				wDet1.wa = pstatusMAD->wa;
+				wDet1.size = wDet1.wp + wDet1.wa;
 			}
 			buffer_f1.buf->mode = DETECTION1;
 			filter1(circ_buf_f1, SIZE_BUF_F1, &buffer_f1,
-					pstatusMAD->NoiseThreshold);
+					pstatusMAD->NoiseThreshold, wDet1);
 			break;
 		case SILENCE:
 			/* no break */

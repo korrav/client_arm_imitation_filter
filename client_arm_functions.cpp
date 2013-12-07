@@ -49,6 +49,11 @@ int com_SET_NOISE[2] = { COM_SET_NOISE, 0 /*значение шумового п
 int ans_SET_NOISE_OK[2] = { COM_SET_NOISE, OK }; //ответ на запрос установить новое значение шумового порога (OK)
 int ans_SET_NOISE_NOT_OK[2] = { COM_SET_NOISE, NOT_OK }; //ответ на запрос установить новое значение шумового порога (NOT_OK)
 
+//установка нового значения параметров wp и wa
+int com_SET_WPWA[3] = {COM_SET_WPWA, 0, 0}; //команда переслать содержимое глобальной структуры состояния МАДа
+int ans_SET_WPWA_OK[2] = { COM_SET_WPWA, OK };
+int ans_SET_WPWA_NOT_OK[2] = { COM_SET_WPWA, NOT_OK };
+
 //сообщение об ошибках в драйвере АЦП
 int mes_ERROR_ADC[2] =
 		{ MES_ERROR_ADC, 0 /*битовое поле с установленными флагами ошибок*/};
