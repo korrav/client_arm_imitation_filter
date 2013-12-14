@@ -50,7 +50,7 @@ int ans_SET_NOISE_OK[2] = { COM_SET_NOISE, OK }; //ответ на запрос 
 int ans_SET_NOISE_NOT_OK[2] = { COM_SET_NOISE, NOT_OK }; //ответ на запрос установить новое значение шумового порога (NOT_OK)
 
 //установка нового значения параметров wp и wa
-int com_SET_WPWA[3] = {COM_SET_WPWA, 0, 0}; //команда переслать содержимое глобальной структуры состояния МАДа
+int com_SET_WPWA[3] = { COM_SET_WPWA, 0, 0 }; //команда переслать содержимое глобальной структуры состояния МАДа
 int ans_SET_WPWA_OK[2] = { COM_SET_WPWA, OK };
 int ans_SET_WPWA_NOT_OK[2] = { COM_SET_WPWA, NOT_OK };
 
@@ -163,4 +163,15 @@ void process_monitor(int* buffer, unsigned int size_count) //функция об
 			}
 		}
 	}
+}
+
+bool data_transmit(dataUnit& buf, int sampl) { //функция передачи блока данных в БЭГ
+	buf.mode = pstatusMAD->modeData_aq;
+	buf.amountCount = sampl;
+	for (int i = 0; i < 4; i++)
+		buf.gain[i] = pstatusMAD->gain[i];
+	return (sendto(sockHandle_data, reinterpret_cast<void*>(&buf),
+			SIZE_PACK(sampl), 0,
+			reinterpret_cast<struct sockaddr*>(&bagAddr_data),
+			sizeof(bagAddr_data)) == -1);
 }

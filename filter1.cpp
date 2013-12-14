@@ -36,10 +36,7 @@ void filter1(int* circ_b /*кольцевой буфер*/,
 			buf->clear_count = 0;
 			//printf("Last time the buffer was not filled: i = %d\n", i);
 			//передача буфера БЭГу
-			sendto(sockHandle_data, reinterpret_cast<void*>(buf->buf),
-					SIZE_PACK(width.size), 0,
-					reinterpret_cast<struct sockaddr*>(&bagAddr_data),
-					sizeof(bagAddr_data));
+			data_transmit(*buf->buf, width.size);
 		}
 		//проверка имеется ли превышение шумового порога
 		for (; i < numsampl / 2; i++) { //интерация по отсчётам
@@ -58,8 +55,7 @@ void filter1(int* circ_b /*кольцевой буфер*/,
 										+ (numsampl / 2 - fill_count) * 4),
 								fill_count * 4 * sizeof(int));
 						buf->buf->numFirstCount = first_count
-								+ (half * numsampl / 2)
-								+ (i - width.wp);
+								+ (half * numsampl / 2) + (i - width.wp);
 						buf->buf->amountCount = width.size;
 						i = numsampl / 2;
 						/*	printf(
@@ -74,8 +70,7 @@ void filter1(int* circ_b /*кольцевой буфер*/,
 								4 * rest * sizeof(int));
 						memcpy(&buf->buf->sampl[rest * 4], half_buf[0],
 								4 * (width.size - rest) * sizeof(int));
-						buf->buf->numFirstCount = first_count + i
-								- width.wp;
+						buf->buf->numFirstCount = first_count + i - width.wp;
 						i += width.wa - 1;
 						buf->buf->amountCount = width.size;
 						/*	printf(
@@ -87,8 +82,7 @@ void filter1(int* circ_b /*кольцевой буфер*/,
 								half_buf[half] + i * 4 - 2 * width.wp,
 								4 * width.size * sizeof(int));
 						buf->buf->numFirstCount = first_count
-								+ (half * numsampl / 2)
-								+ (i - width.wp);
+								+ (half * numsampl / 2) + (i - width.wp);
 						buf->buf->amountCount = width.size;
 						i += width.wa - 1;
 						/*						printf(
@@ -96,10 +90,7 @@ void filter1(int* circ_b /*кольцевой буфер*/,
 						 buf->buf->numFirstCount, i);*/
 					}
 					//передача буфера БЭГу
-					sendto(sockHandle_data, reinterpret_cast<void*>(buf->buf),
-							SIZE_PACK(width.size), 0,
-							reinterpret_cast<struct sockaddr*>(&bagAddr_data),
-							sizeof(bagAddr_data));
+					data_transmit(*buf->buf, width.size);
 					break;
 				}
 			}

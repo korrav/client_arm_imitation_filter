@@ -129,14 +129,14 @@ extern int ans_SET_WPWA_NOT_OK[2]; //ответ на запрос установ
 #define MES_ERROR_ADC 9
 extern int mes_ERROR_ADC[2];
 //ГЛОБАЛЬНАЯ СТРУКТУРА СОСТОЯНИЯ МОДУЛЯ МАД
-struct status_MAD {
+extern struct status_MAD {
 	int ident; //идентификатор блока данных (COM_GET_STATUS_MAD)
 	int gain[4]; //текущий коэффициент усиления (в абсолютных значениях)
 	data_collection_mode modeData_aq; //текущий режим сбора данных МАД
 	int NoiseThreshold; //текущий шумовой порог алгоритма распознавания
 	int wp; //количество отсчётов до события; используется в режиме DETECT1
 	int wa; //количество отсчётов после события; используется в режиме DETECT1
-};
+}  *pstatusMAD; //указатель на глобальную структуру состояния модуля МАД;
 #define INIT_GAIN1_DB 0	//начальный коэфиициент усиления в дцБ для канала 1
 #define INIT_GAIN2_DB 0	//начальный коэфиициент усиления в дцБ для канала 2
 #define INIT_GAIN3_DB 0	//начальный коэфиициент усиления в дцБ для канала 3
@@ -175,6 +175,7 @@ extern prev_com prevCom; //здесь хранится дейтаграмма п
 struct dataUnit {
 	int ident; //идентификатор блока данных
 	int mode; //режим сбора данных
+	int gain[4]; //текущий коэффициент усиления (в абсолютных значениях)
 	unsigned int numFirstCount; //номер первого отсчёта
 	unsigned int amountCount; //количество отсчётов (1 отс = 4 x 4 байт)
 	int id_MAD; //идентификатор МАДа
@@ -236,6 +237,7 @@ void filter1(int* circ_b /*кольцевой буфер*/,
 //РАЗНОЕ
 void check_error(dataUnit_ADC& buffer_ADC);	//функция проверка буфера на ошибки в драйвере
 void fill_buffer(dataUnit_ADC& buffer_ADC); //функция заполнения буфера отсчётами
+bool data_transmit(dataUnit& buf, int sampl);//функция передачи блока данных в БЭГ
 extern int fd_adc, fd_amp, fd_mux; //дескрипторы узлов ацп, усилителя и мультиплексора
 #define AMOUNT_AN 100000	//количество отсчётов, которое учитывается при расчёте мониторограммы
 #define SIZE_PACK(x) (sizeof(dataUnit) - (MAX_SIZE_SAMPL - x) * 4 * sizeof(int))	//макрос, определяющий размер пакета режима передачи

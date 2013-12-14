@@ -41,7 +41,7 @@ dg que[QSIZE + 1]; //очередь сообщений
 extern int iget; //следующий элемент для обработки в цикле программы
 extern int iput; //следующий элемент для обработки в цикле обработчика сигнала SIGIO
 extern int nqueue; //количество дейтаграмм в очереди
-static status_MAD *pstatusMAD = NULL; //указатель на глобальную структуру состояния модуля МАД
+status_MAD *pstatusMAD = NULL; //указатель на глобальную структуру состояния модуля МАД
 int flags = 0; //набор флагов
 static int shmid = 0, shmid_mon; // дескриптор разделяемой памяти для глобальной структуры состояния и структуры мониторограммы
 static int semid; //дескриптор семафора
@@ -468,12 +468,10 @@ int main(int argc, char *argv[]) {
 							sizeof(ans_SET_WPWA_NOT_OK), 0,
 							reinterpret_cast<sockaddr*>(&bagAddr_control),
 							sizeof(bagAddr_control));
-				}
-				else {
+				} else {
 					pstatusMAD->wp = que[iget].dg_data[1];
 					pstatusMAD->wa = que[iget].dg_data[2];
-					sendto(sockHandle,
-							reinterpret_cast<void*>(ans_SET_WPWA_OK),
+					sendto(sockHandle, reinterpret_cast<void*>(ans_SET_WPWA_OK),
 							sizeof(ans_SET_WPWA_OK), 0,
 							reinterpret_cast<sockaddr*>(&bagAddr_control),
 							sizeof(bagAddr_control));
@@ -639,17 +637,12 @@ void data_acquisition_from_ADC() {
 				wDet1.wa = pstatusMAD->wa;
 				wDet1.size = wDet1.wp + wDet1.wa;
 			}
-			buffer_f1.buf->mode = DETECTION1;
 			filter1(circ_buf_f1, SIZE_BUF_F1, &buffer_f1,
 					pstatusMAD->NoiseThreshold, wDet1);
 			break;
 		case SILENCE:
 			/* no break */
 		case CONTINUOUS: //РЕЖИМ НЕПРЕРЫВНОГО  ПОТОКА  ДАННЫХ
-			if (pstatusMAD->modeData_aq == SILENCE)
-				dataUnit_toBag.mode = SILENCE;
-			else
-				dataUnit_toBag.mode = CONTINUOUS;
 			//передача незаполненного блока данных в драйвер АЦП
 			buffer_ADC.pUnit = dataUnit_toBag.sampl;
 			buffer_ADC.amountCount = NUM_SAMPL_UNIT;
@@ -660,21 +653,9 @@ void data_acquisition_from_ADC() {
 			// получение данных для мониторограммы, а также передача мониторограмм в БЭГ
 			process_monitor(buffer_ADC.pUnit, buffer_ADC.amountCount);
 			//передача данных в БЭГ
-			if (dataUnit_toBag.mode != SILENCE) {
-				if (sendto(sockHandle_data,
-						reinterpret_cast<void*>(&dataUnit_toBag),
-						SIZE_PACK(NUM_SAMPL_UNIT), 0,
-						reinterpret_cast<struct sockaddr*>(&bagAddr_data),
-						sizeof(bagAddr_data)) == -1)
+			if (pstatusMAD->modeData_aq != SILENCE) {
+				if (data_transmit(dataUnit_toBag, buffer_ADC.amountCount))
 					perror("Not transmit data\n");
-				/*				sendto(sockHandle_data,
-				 reinterpret_cast<void*>(&dataUnit_toBag),
-				 sizeof(dataUnit), 0,
-				 reinterpret_cast<struct sockaddr*>(&bagAddr_data),
-				 sizeof(bagAddr_data));*/
-				/*								printf(
-				 "The data unit with number of the first counting is sent %u\n",
-				 dataUnit_toBag.numFirstCount);*/
 			}
 			break;
 		}
